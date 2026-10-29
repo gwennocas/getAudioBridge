@@ -1,0 +1,13 @@
+* text=auto
+*.rs text eol=lf
+*.ts text eol=lf
+*.kt text eol=lf
+*.kts text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.toml text eol=lf
+*.lock text eol=lf
+*.css text eol=lf
+*.svg text eol=lf
+gradlew text eol=lf
+*.bat text eol=crlf

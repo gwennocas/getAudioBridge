@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/bridge-core", "src-tauri", "plugins/tauri-plugin-audio-output"]
+resolver = "2"

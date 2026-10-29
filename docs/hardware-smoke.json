@@ -1,0 +1,178 @@
+{
+  "date": "2026-10-29T10:55:44.186Z",
+  "ip": "192.168.1.2",
+  "checks": [
+    "Continuous native Wi-Fi UDP reception",
+    "20/120/60 ms buffer controls and bounds",
+    "Transmitter stop/restart without reconnecting Android",
+    "Disconnect releases playback and receiver",
+    "Reconnect restores playback"
+  ],
+  "snapshots": [
+    {
+      "label": "start",
+      "stream": {
+        "state": "receiving",
+        "error": null,
+        "packets": 518,
+        "bytes": 518000,
+        "lost": 0,
+        "late": 0,
+        "duplicates": 0,
+        "invalid": 0,
+        "rebuffers": 0,
+        "trims": 1,
+        "bufferMs": 59.23180980607867,
+        "targetMs": 60,
+        "driftPpm": 387.59669440380424,
+        "jitterMs": 4.320982638762544,
+        "peer": "192.168.1.2:45150",
+        "peak": 0.0013427734375
+      },
+      "output": {
+        "bufferFrames": 480,
+        "bufferIncreases": 0,
+        "hardwareQueueMs": 38,
+        "lowLatency": true,
+        "queuedMs": 10,
+        "route": "h2w (tipo 4)",
+        "running": true,
+        "timestampAvailable": true,
+        "underruns": 0,
+        "writes": 475
+      }
+    },
+    {
+      "label": "buffer-20",
+      "stream": {
+        "state": "receiving",
+        "error": null,
+        "packets": 1938,
+        "bytes": 1938000,
+        "lost": 0,
+        "late": 0,
+        "duplicates": 0,
+        "invalid": 0,
+        "rebuffers": 0,
+        "trims": 2,
+        "bufferMs": 19.912576340138912,
+        "targetMs": 20,
+        "driftPpm": 71.50389783766262,
+        "jitterMs": 4.573979390527939,
+        "peer": "192.168.1.2:45150",
+        "peak": 0.008941650390625
+      },
+      "output": {
+        "bufferFrames": 960,
+        "bufferIncreases": 2,
+        "hardwareQueueMs": 48,
+        "lowLatency": true,
+        "queuedMs": 20,
+        "route": "h2w (tipo 4)",
+        "running": true,
+        "timestampAvailable": true,
+        "underruns": 2,
+        "writes": 1894
+      }
+    },
+    {
+      "label": "buffer-120",
+      "stream": {
+        "state": "receiving",
+        "error": null,
+        "packets": 2346,
+        "bytes": 2346000,
+        "lost": 0,
+        "late": 0,
+        "duplicates": 0,
+        "invalid": 0,
+        "rebuffers": 0,
+        "trims": 2,
+        "bufferMs": 115.43506534770131,
+        "targetMs": 120,
+        "driftPpm": -355.20327151772733,
+        "jitterMs": 3.9643577645688133,
+        "peer": "192.168.1.2:45150",
+        "peak": 0.000335693359375
+      },
+      "output": {
+        "bufferFrames": 960,
+        "bufferIncreases": 2,
+        "hardwareQueueMs": 48,
+        "lowLatency": true,
+        "queuedMs": 20,
+        "route": "h2w (tipo 4)",
+        "running": true,
+        "timestampAvailable": true,
+        "underruns": 2,
+        "writes": 2302
+      }
+    },
+    {
+      "label": "buffer-60",
+      "stream": {
+        "state": "receiving",
+        "error": null,
+        "packets": 2758,
+        "bytes": 2758000,
+        "lost": 0,
+        "late": 0,
+        "duplicates": 0,
+        "invalid": 0,
+        "rebuffers": 0,
+        "trims": 3,
+        "bufferMs": 54.93783414363861,
+        "targetMs": 60,
+        "driftPpm": 45.85250149069378,
+        "jitterMs": 4.37998868518137,
+        "peer": "192.168.1.2:45150",
+        "peak": 0.010772705078125
+      },
+      "output": {
+        "bufferFrames": 960,
+        "bufferIncreases": 2,
+        "hardwareQueueMs": 48,
+        "lowLatency": true,
+        "queuedMs": 20,
+        "route": "h2w (tipo 4)",
+        "running": true,
+        "timestampAvailable": true,
+        "underruns": 2,
+        "writes": 2714
+      }
+    },
+    {
+      "label": "final",
+      "stream": {
+        "state": "receiving",
+        "error": null,
+        "packets": 510,
+        "bytes": 510000,
+        "lost": 0,
+        "late": 0,
+        "duplicates": 0,
+        "invalid": 0,
+        "rebuffers": 0,
+        "trims": 0,
+        "bufferMs": 60.003810876141266,
+        "targetMs": 60,
+        "driftPpm": 21.31094377323684,
+        "jitterMs": 3.847423655676226,
+        "peer": "192.168.1.2:45150",
+        "peak": 0.00579833984375
+      },
+      "output": {
+        "bufferFrames": 720,
+        "bufferIncreases": 1,
+        "hardwareQueueMs": 43,
+        "lowLatency": true,
+        "queuedMs": 15,
+        "route": "h2w (tipo 4)",
+        "running": true,
+        "timestampAvailable": true,
+        "underruns": 1,
+        "writes": 494
+      }
+    }
+  ]
+}
