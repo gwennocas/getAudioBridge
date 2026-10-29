@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-29T11:29:50.812Z",
+  "checks": [
+    "Oversized and malformed UDP controls do not terminate capture",
+    "Occupied port produces an error without leaving a transmitter running",
+    "Transmission and Android handshake recover after restart"
+  ],
+  "snapshots": [
+    {
+      "label": "before",
+      "stream": {
+        "state": "streaming",
+        "error": null,
+        "packets": 23554,
+        "bytes": 23554000,
+        "lost": 0,
+        "late": 0,
+        "duplicates": 0,
+        "invalid": 0,
+        "rebuffers": 0,
+        "trims": 1,
+        "bufferMs": 0,
+        "targetMs": 0,
+        "driftPpm": 0,
+        "jitterMs": 0,
+        "peer": "192.168.1.4:41844",
+        "peak": 0.000030517578125
+      },
+      "output": null
+    },
+    {
+      "label": "restarted",
+      "stream": {
+        "state": "streaming",
+        "error": null,
+        "packets": 425,
+        "bytes": 425000,
+        "lost": 0,
+        "late": 0,
+        "duplicates": 0,
+        "invalid": 0,
+        "rebuffers": 0,
+        "trims": 1,
+        "bufferMs": 0,
+        "targetMs": 0,
+        "driftPpm": 0,
+        "jitterMs": 0,
+        "peer": "192.168.1.4:41844",
+        "peak": 0
+      },
+      "output": null
+    }
+  ]
+}

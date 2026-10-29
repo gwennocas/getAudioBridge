@@ -14,6 +14,14 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// Private key and passwords stay outside the repository. The release build never
+// falls back to the shared Android debug key.
+val signingPropertiesFile = file(System.getenv("GAB_SIGNING_PROPERTIES")
+    ?: "${System.getProperty("user.home")}/.android/getAudioBridge-release/keystore.properties")
+val releaseSigning = Properties().apply {
+    if (signingPropertiesFile.isFile) signingPropertiesFile.inputStream().use { load(it) }
+}
+
 android {
     compileSdk = 36
     namespace = "app.getaudiobridge.mobile"
@@ -22,8 +30,19 @@ android {
         applicationId = "app.getaudiobridge.mobile"
         minSdk = 26
         targetSdk = 36
-        versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
+        versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1001").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+    }
+    signingConfigs {
+        create("release") {
+            if (signingPropertiesFile.isFile) {
+                storeFile = file(releaseSigning.getProperty("storeFile"))
+                storePassword = releaseSigning.getProperty("storePassword")
+                keyAlias = releaseSigning.getProperty("keyAlias")
+                keyPassword = releaseSigning.getProperty("keyPassword")
+                storeType = "PKCS12"
+            }
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -39,6 +58,9 @@ android {
             }
         }
         getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+            isDebuggable = false
+            isJniDebuggable = false
             optimization {
                enable = true
             }

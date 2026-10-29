@@ -18,6 +18,28 @@ type Result<T> = std::result::Result<T, String>;
 fn err(e: impl std::fmt::Display) -> String {
     e.to_string()
 }
+
+fn transient_receive_error(error: &std::io::Error) -> bool {
+    // On Windows, oversized UDP datagrams report WSAEMSGSIZE instead of returning
+    // truncated data. ICMP port-unreachable can surface as WSAECONNRESET after a
+    // phone disconnects. Neither should terminate the capture thread.
+    error.raw_os_error() == Some(10040)
+        || matches!(
+            error.kind(),
+            std::io::ErrorKind::ConnectionReset
+                | std::io::ErrorKind::ConnectionRefused
+                | std::io::ErrorKind::TimedOut
+        )
+}
+
+fn transient_send_error(error: &std::io::Error) -> bool {
+    transient_receive_error(error)
+        || matches!(error.raw_os_error(), Some(10051 | 10065))
+        || matches!(
+            error.kind(),
+            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::Interrupted
+        )
+}
 struct Com;
 impl Com {
     fn init() -> Result<Self> {
@@ -177,6 +199,11 @@ fn capture(
                     }
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
+                Err(e) if transient_receive_error(&e) => {
+                    if e.raw_os_error() == Some(10040) {
+                        stats.lock().unwrap().invalid += 1;
+                    }
+                }
                 Err(e) => return Err(err(e)),
             }
         }
@@ -252,7 +279,7 @@ fn capture(
                             .map(|p| (i16::from_le_bytes([p[0], p[1]]) as f64).abs() / 32768.0)
                             .fold(0.0, f64::max);
                     }
-                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    Err(e) if transient_send_error(&e) => {
                         stats.lock().unwrap().lost += 1;
                     }
                     Err(e) => return Err(err(e)),
@@ -269,4 +296,33 @@ fn capture(
     client.stop_stream().map_err(err)?;
     stats.lock().unwrap().state = "stopped".into();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn malformed_datagrams_and_disconnected_receivers_do_not_stop_capture() {
+        assert!(transient_receive_error(&std::io::Error::from_raw_os_error(
+            10040
+        )));
+        assert!(transient_receive_error(&std::io::Error::from(
+            std::io::ErrorKind::ConnectionReset
+        )));
+        assert!(transient_receive_error(&std::io::Error::from(
+            std::io::ErrorKind::ConnectionRefused
+        )));
+        assert!(!transient_receive_error(&std::io::Error::from(
+            std::io::ErrorKind::PermissionDenied
+        )));
+        assert!(transient_send_error(&std::io::Error::from_raw_os_error(
+            10065
+        )));
+        assert!(transient_send_error(&std::io::Error::from_raw_os_error(
+            10051
+        )));
+        assert!(!transient_send_error(&std::io::Error::from(
+            std::io::ErrorKind::PermissionDenied
+        )));
+    }
 }

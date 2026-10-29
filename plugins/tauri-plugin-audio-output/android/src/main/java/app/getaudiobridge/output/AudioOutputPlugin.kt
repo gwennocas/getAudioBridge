@@ -28,6 +28,7 @@ class AudioOutputPlugin(private val host: Activity) : Plugin(host) {
     companion object {
         @JvmStatic external fun nativeRead(buffer: ByteBuffer, frames: Int): Int
         @JvmStatic external fun nativeSuspend()
+        @JvmStatic external fun nativeStats(): String?
     }
     private val running = AtomicBoolean(false)
     private val control = Executors.newSingleThreadExecutor()
@@ -85,6 +86,12 @@ class AudioOutputPlugin(private val host: Activity) : Plugin(host) {
         var previousHead = 0L; var headWrap = 0L
         var previousUnderruns = 0
         try {
+            // Prime the effective native queue before starting the hardware. Starting an
+            // empty track caused avoidable startup underruns and unnecessary buffer growth.
+            val warmup = ByteArray(minOf(audio.bufferSizeInFrames, 1920) * 4)
+            val primed = audio.write(warmup, 0, warmup.size, AudioTrack.WRITE_NON_BLOCKING)
+            check(primed >= 0) { "AudioTrack prefill: $primed" }
+            framesWritten = primed / 4L
             audio.play()
             while (running.get()) {
                 pcm.clear()
@@ -116,7 +123,9 @@ class AudioOutputPlugin(private val host: Activity) : Plugin(host) {
                     route = audio.routedDevice?.let { "${it.productName} (tipo ${it.type})" } ?: "Saída do sistema"
                     timestampAvailable = audio.getTimestamp(stamp)
                     if (timestampAvailable) hardwareQueueMs = maxOf(0.0, (framesWritten - stamp.framePosition).toDouble() / 48.0)
-                    Log.i("getAudioBridge", "writes=$writes queuedMs=$queuedMs underruns=${audio.underrunCount} route=$route")
+                    if (writes % 400L == 0L && Log.isLoggable("getAudioBridge", Log.DEBUG)) {
+                        Log.d("getAudioBridge", "writes=$writes queuedMs=$queuedMs underruns=${audio.underrunCount} bufferFrames=${audio.bufferSizeInFrames} route=$route metrics=${nativeStats()}")
+                    }
                 }
             }
         } catch (e: Exception) { if (running.get()) { error = e.message; Log.e("getAudioBridge", "Playback failed", e) } }
@@ -134,6 +143,7 @@ class AudioOutputPlugin(private val host: Activity) : Plugin(host) {
         worker = null
         track?.let { try { it.flush(); it.release() } catch (_: Exception) {} }
         track = null
+        queuedMs = 0.0; hardwareQueueMs = 0.0; timestampAvailable = false
         manager.abandonAudioFocusRequest(focus)
         host.runOnUiThread { host.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }

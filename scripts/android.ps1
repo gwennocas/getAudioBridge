@@ -1,4 +1,4 @@
-param([ValidateSet('init','build','install','devices')][string]$Action='build',[string]$Sdk=$env:ANDROID_HOME)
+param([ValidateSet('init','build','install','devices')][string]$Action='build',[string]$Sdk=$env:ANDROID_HOME,[switch]$Release)
 $ErrorActionPreference='Stop'
 $bridgeRoot = Split-Path $PSScriptRoot -Parent
 if (!$Sdk) {
@@ -12,28 +12,48 @@ if (!(Test-Path $Sdk)) { throw 'Defina ANDROID_HOME ou passe -Sdk com o caminho 
 $env:ANDROID_HOME = (Resolve-Path $Sdk).Path
 $env:NDK_HOME = (Get-ChildItem "$Sdk\ndk" -Directory | Sort-Object Name | Select-Object -Last 1).FullName
 $adb = Join-Path $Sdk 'platform-tools\adb.exe'
+$androidBuildMutex = $null
+$ownsAndroidBuildMutex = $false
 Push-Location $bridgeRoot
 try {
     switch ($Action) {
         'devices' { & $adb devices -l }
         'init' { npm.cmd run tauri -- android init --ci; if ($LASTEXITCODE) { throw 'Falha no init Android' } }
         'build' {
+            $androidBuildMutex = [Threading.Mutex]::new($false, 'Local\getAudioBridgeAndroidBuild')
+            try { $ownsAndroidBuildMutex = $androidBuildMutex.WaitOne(0) }
+            catch [Threading.AbandonedMutexException] { $ownsAndroidBuildMutex = $true }
+            if (!$ownsAndroidBuildMutex) { throw 'Another getAudioBridge Android build is already running. Wait before starting another build.' }
+            if ($Release) {
+                $signingFile = $env:GAB_SIGNING_PROPERTIES
+                if (!$signingFile) { $signingFile = Join-Path $env:USERPROFILE '.android\getAudioBridge-release\keystore.properties' }
+                if (!(Test-Path -LiteralPath $signingFile)) { throw 'Release signing is missing. Run scripts/new-signing-key.ps1 first and preserve that private key.' }
+            }
             New-Item .logs -ItemType Directory -Force | Out-Null
-            & cmd.exe /d /c 'npm.cmd run tauri -- android build --debug --target aarch64 --apk 2>&1' | Tee-Object .logs/android-build.log
+            $buildProfile = if ($Release) { 'release' } else { 'debug' }
+            $variant = if ($Release) { 'Release' } else { 'Debug' }
+            $buildLog = ".logs/android-$buildProfile-$PID.log"
+            $buildCommand = if ($Release) { 'npm.cmd run tauri -- android build --target aarch64 --apk 2>&1' } else { 'npm.cmd run tauri -- android build --debug --target aarch64 --apk 2>&1' }
+            & cmd.exe /d /c $buildCommand | Tee-Object $buildLog
             if ($LASTEXITCODE) {
                 # Tauri CLI uses symlinks; copy the compiled .so on Windows without Developer Mode.
-                if (!(Select-String -Path .logs/android-build.log -SimpleMatch 'Creation symbolic link is not allowed')) { throw 'Compilação Android falhou; consulte .logs/android-build.log' }
+                if (!(Select-String -Path $buildLog -SimpleMatch 'Creation symbolic link is not allowed')) { throw "Android build failed; see $buildLog" }
                 $jni = 'src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a'
                 New-Item $jni -ItemType Directory -Force | Out-Null
-                Copy-Item -LiteralPath 'target/aarch64-linux-android/debug/libget_audio_bridge_lib.so' -Destination "$jni/libget_audio_bridge_lib.so" -Force
-                & './src-tauri/gen/android/gradlew.bat' -p src-tauri/gen/android ':app:assembleArm64Debug' -x ':app:rustBuildArm64Debug' --no-configuration-cache --console=plain
+                Copy-Item -LiteralPath "target/aarch64-linux-android/$buildProfile/libget_audio_bridge_lib.so" -Destination "$jni/libget_audio_bridge_lib.so" -Force
+                & './src-tauri/gen/android/gradlew.bat' -p src-tauri/gen/android ":app:assembleArm64$variant" -x ":app:rustBuildArm64$variant" --no-configuration-cache --console=plain
                 if ($LASTEXITCODE) { throw 'Falha no empacotamento Gradle' }
             }
         }
         'install' {
-            & $adb install -r 'src-tauri/gen/android/app/build/outputs/apk/arm64/debug/app-arm64-debug.apk'
+            $buildProfile = if ($Release) { 'release' } else { 'debug' }
+            & $adb install -r "src-tauri/gen/android/app/build/outputs/apk/arm64/$buildProfile/app-arm64-$buildProfile.apk"
             if ($LASTEXITCODE) { throw 'Falha na instalação do APK' }
             & $adb shell am start -n app.getaudiobridge.mobile/.MainActivity
         }
     }
-} finally { Pop-Location }
+} finally {
+    if ($ownsAndroidBuildMutex) { $androidBuildMutex.ReleaseMutex() }
+    if ($androidBuildMutex) { $androidBuildMutex.Dispose() }
+    Pop-Location
+}

@@ -1,3 +1,8 @@
 [workspace]
 members = ["crates/bridge-core", "src-tauri", "plugins/tauri-plugin-audio-output"]
 resolver = "2"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"

@@ -4,6 +4,10 @@ node_modules/
 !.env.example
 *.jks
 *.keystore
+*.p12
+*.pfx
+keystore.properties
+key.properties
 dist/
 target/
 .tools/

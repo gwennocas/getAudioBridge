@@ -2,7 +2,7 @@
 use crate::commands::RECEIVER;
 use jni::{
     objects::{JByteBuffer, JClass},
-    sys::jint,
+    sys::{jint, jstring},
     JNIEnv,
 };
 
@@ -39,6 +39,24 @@ pub extern "system" fn Java_app_getaudiobridge_output_AudioOutputPlugin_nativeRe
         p.copy_from_slice(&v.to_le_bytes());
     }
     960
+}
+
+/// Optional native metrics for device qualification. Kotlin only calls this when
+/// Android's getAudioBridge debug log tag is explicitly enabled; no PCM is logged.
+#[no_mangle]
+pub extern "system" fn Java_app_getaudiobridge_output_AudioOutputPlugin_nativeStats(
+    env: JNIEnv,
+    _class: JClass,
+) -> jstring {
+    let stats = RECEIVER.lock().ok().and_then(|receiver| {
+        receiver
+            .as_ref()
+            .and_then(|r| r.buffer.lock().ok().map(|buffer| buffer.stats.clone()))
+    });
+    let json = serde_json::to_string(&stats).unwrap_or_else(|_| "null".into());
+    env.new_string(json)
+        .map(|s| s.into_raw())
+        .unwrap_or(std::ptr::null_mut())
 }
 
 #[no_mangle]

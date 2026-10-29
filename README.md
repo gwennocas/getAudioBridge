@@ -2,11 +2,13 @@
 
 Áudio do sistema Windows → rede local → Android → saída escolhida pelo sistema (fone com fio, USB-C, alto-falante ou outra rota). Dois alvos **Tauri 2**, interface TypeScript, transporte/buffer em Rust e reprodução Android em Kotlin/AudioTrack. Sem serviços externos em tempo de execução.
 
-## Download da prévia
+## Download
 
-[Baixar getAudioBridge v0.1.0-alpha.1 para Windows e Android](https://github.com/gwennocas/getAudioBridge/releases/tag/v0.1.0-alpha.1).
+[Baixar getAudioBridge v0.1.0 para Windows e Android](https://github.com/gwennocas/getAudioBridge/releases/tag/v0.1.0).
 
-Esta prévia contém o executável Windows x64 e o APK Android arm64 usados nos testes. São **builds de desenvolvimento**, sem instalador Windows e sem assinatura de distribuição. O APK usa assinatura debug e inclui símbolos de depuração, por isso é maior que uma versão otimizada. No Windows, o WebView2 precisa estar instalado. Consulte [o registro de validação](docs/validation.md) para os testes realizados e suas limitações.
+A primeira versão estável cobre transmissão local Wi-Fi/UDP, Windows x64 e Android arm64 em primeiro plano. A distribuição contém **instalador Windows e APK otimizado assinado com chave própria**, compilados em perfil release. O APK não é depurável. O instalador Windows não tem certificado comercial de editor e requer WebView2, que pode ser instalado quando estiver ausente.
+
+Se você instalou a prévia debug `v0.1.0-alpha.1`, guarde IP, porta e buffer, desinstale-a e instale o novo APK uma vez: a chave de assinatura mudou. Futuras atualizações da distribuição preservarão a chave própria. Consulte [a validação](docs/validation.md) para os testes realizados, equipamentos e limites. A latência física até o fone não foi medida e o desempenho depende da rede e do aparelho.
 
 ## Usar
 
@@ -21,7 +23,7 @@ Se não conectar: confirme IP/porta, evite rede de convidados/isolamento de clie
 
 ## Compilar
 
-Requisitos: Node 22+, Rust estável, ferramentas C++/WebView2 para Tauri no Windows. Android: JDK 21, SDK 36, NDK e target `aarch64-linux-android`. Android mínimo: API 26 (Android 8). A compilação precisa baixar dependências; os binários funcionam sem internet.
+Requisitos: Node 22.12+, Rust estável, ferramentas C++/WebView2 para Tauri no Windows. Android: JDK 21, SDK 36, NDK e target `aarch64-linux-android`. Android mínimo: API 26 (Android 8). A compilação precisa baixar dependências; os binários funcionam sem internet.
 
 ```powershell
 npm ci
@@ -41,12 +43,16 @@ rustup target add aarch64-linux-android
 .\scripts\android.ps1 install
 ```
 
-O script usa o NDK mais recente do SDK e gera **APK debug arm64**, assinado com a chave de desenvolvimento padrão. Não é uma distribuição release. Ele também contorna a exigência de links simbólicos da CLI Tauri em Windows sem Developer Mode: após a compilação Rust, copia o `.so` e empacota com Gradle, sem repetir a tarefa Rust. `-Sdk` também permite passar o SDK explicitamente. A descoberta do SDK do projeto vizinho getYoink é uma conveniência deste ambiente; não é dependência do aplicativo.
+Por padrão o script gera APK debug arm64 para desenvolvimento. Para distribuição, execute `scripts/new-signing-key.ps1` uma única vez e depois `scripts/android.ps1 build -Release`. Preserve a chave privada fora do repositório; ela é necessária para atualizar os APKs. [Instruções de distribuição e assinatura](docs/releasing.md).
+
+O script usa o NDK mais recente do SDK e contorna a exigência de links simbólicos da CLI Tauri em Windows sem Developer Mode: após a compilação Rust, copia o `.so` e empacota com Gradle, sem repetir a tarefa Rust. `-Sdk` permite passar o SDK explicitamente. A descoberta do SDK do projeto vizinho getYoink é uma conveniência deste ambiente; não é dependência do aplicativo. O script impede duas builds Android simultâneas e mantém logs separados por execução.
 
 Saídas:
 
 - Windows: `target/debug/get-audio-bridge.exe`.
 - Android: `src-tauri/gen/android/app/build/outputs/apk/arm64/debug/app-arm64-debug.apk`.
+- Instalador Windows release: `target/release/bundle/nsis/getAudioBridge_0.1.0_x64-setup.exe`.
+- Android release: `src-tauri/gen/android/app/build/outputs/apk/arm64/release/app-arm64-release.apk`.
 
 ## Fluxo nativo
 
@@ -78,11 +84,11 @@ Protocolo completo: [docs/protocol.md](docs/protocol.md). Procedimento de mediç
 
 ```powershell
 npm run build
-cargo test -p bridge-core
+cargo test --workspace --all-targets
 cargo check -p get-audio-bridge
 ```
 
-Os testes exercitam validação de pacotes, perda, duplicação, atraso, recuperação de backlog e diferença de relógio simulada. Não substituem medição física de latência, avaliação auditiva ou testes de rotas com fones diferentes.
+Os 11 testes exercitam validação de pacotes, perda, duplicação, estéreo, troca de buffer, recuperação de backlog, diferença de relógio nos dois sentidos e erros UDP temporários no Windows. Não substituem medição física de latência, avaliação auditiva ou testes de rotas com fones diferentes.
 
 ## Estrutura
 

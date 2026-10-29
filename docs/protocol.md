@@ -22,6 +22,8 @@ HELLO/BYE têm exatamente 40 bytes; AUDIO tem exatamente 1000 bytes (abaixo do M
 
 A linha de frames avança também enquanto não há cliente. Ao iniciar uma nova captura, epoch muda e a linha reinicia. O receptor esvazia o buffer ao observar epoch novo, retendo até oito epochs aposentados para ignorar pacotes antigos em trânsito. Timestamps não podem ser subtraídos de um relógio Android para inferir latência de ponta a ponta.
 
+Valores de timestamp extremos são rejeitados antes do buffer: a reprodução fracionária usa `f64`, por isso o frame máximo aceito é `2^52 - 240`. Esse limite representa milhares de anos de áudio e impede que datagramas malformados atinjam conversões numéricas inseguras.
+
 Keepalive: HELLO a cada 500 ms, expiração em 3 s. Sem AUDIO por 3 s: estado de espera, buffer esvaziado; HELLO continua permitindo reconexão automática enquanto o app está aberto. Ao sair do app, socket e reprodução são encerrados. Reconectar cria novo token.
 
 Sem ARQ/FEC, compressão ou encriptação nesta versão. Perda resulta em silêncio e contagem no momento do consumo; `lost` não estima pacotes que nunca chegaram antes do início da reprodução. A ausência de fluxo completo gera `rebuffers`, não um número fictício de pacotes perdidos.

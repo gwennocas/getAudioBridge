@@ -1,0 +1,90 @@
+{
+  "profile": "release",
+  "start": "2026-10-29T08:35:40.509-03:00",
+  "end": "2026-10-29T08:39:12.509-03:00",
+  "durationSeconds": 212,
+  "sampleCount": 107,
+  "targetsMs": [
+    60
+  ],
+  "routes": [
+    "h2w (tipo 4)"
+  ],
+  "packetsDuringInterval": 42397,
+  "missingDuringInterval": 0,
+  "rebuffersDuringInterval": 1,
+  "trimsDuringInterval": 0,
+  "underrunsDuringInterval": 0,
+  "nativeQueueMs": {
+    "min": 10,
+    "max": 10
+  },
+  "nativeBufferFrames": {
+    "min": 480,
+    "max": 480
+  },
+  "jitterBufferMs": {
+    "min": 38.45162354619242,
+    "max": 59.96778981760144
+  },
+  "driftPpm": {
+    "min": -947.1915815601038,
+    "max": 556.5019455498312
+  },
+  "errors": [],
+  "first": {
+    "time": "2026-10-29T08:35:40.509-03:00",
+    "pid": 8692,
+    "writes": 400,
+    "queuedMs": 10,
+    "underruns": 0,
+    "bufferFrames": 480,
+    "route": "h2w (tipo 4)",
+    "stream": {
+      "state": "receiving",
+      "error": null,
+      "packets": 424,
+      "bytes": 424000,
+      "lost": 0,
+      "late": 0,
+      "duplicates": 0,
+      "invalid": 0,
+      "rebuffers": 0,
+      "trims": 0,
+      "bufferMs": 55.316113671287894,
+      "targetMs": 60,
+      "driftPpm": -227.9744692568269,
+      "jitterMs": 4.765486627993301,
+      "peer": "192.168.1.2:45150",
+      "peak": 0.013641357421875
+    }
+  },
+  "last": {
+    "time": "2026-10-29T08:39:12.509-03:00",
+    "pid": 8692,
+    "writes": 42800,
+    "queuedMs": 10,
+    "underruns": 0,
+    "bufferFrames": 480,
+    "route": "h2w (tipo 4)",
+    "stream": {
+      "state": "receiving",
+      "error": null,
+      "packets": 42821,
+      "bytes": 42821000,
+      "lost": 0,
+      "late": 0,
+      "duplicates": 0,
+      "invalid": 0,
+      "rebuffers": 1,
+      "trims": 0,
+      "bufferMs": 54.488325864076614,
+      "targetMs": 60,
+      "driftPpm": -20.043300409102628,
+      "jitterMs": 4.893782988996918,
+      "peer": "192.168.1.2:45150",
+      "peak": 0.001220703125
+    }
+  },
+  "note": "Native queue and jitter buffer are separate indicators, not physical headphone latency. This is a limited hardware observation, not a guarantee for every network or device."
+}

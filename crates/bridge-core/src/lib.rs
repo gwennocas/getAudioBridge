@@ -11,6 +11,9 @@ pub const PACKET: usize = HEADER + SAMPLES * 2;
 pub const HELLO: u8 = 1;
 pub const AUDIO: u8 = 2;
 pub const BYE: u8 = 3;
+// The wire uses u64, while fractional playout uses f64. Keep even deliberately
+// malformed timestamps in the exactly representable range (thousands of years).
+const MAX_FRAME: u64 = (1_u64 << 52) - FRAMES as u64;
 
 pub fn token() -> Result<u64, String> {
     let mut b = [0; 8];
@@ -64,7 +67,7 @@ pub fn decode(b: &[u8]) -> Option<Header> {
         if b.len() != PACKET
             || frames as usize != FRAMES
             || frame % FRAMES as u64 != 0
-            || frame.checked_add(FRAMES as u64).is_none()
+            || frame > MAX_FRAME
             || sequence != (frame / FRAMES as u64) as u32
         {
             return None;
@@ -150,7 +153,7 @@ impl JitterBuffer {
         self.stats.peak = 0.0;
     }
     pub fn insert(&mut self, frame: u64, data: &[u8]) {
-        if data.len() != SAMPLES * 2 || frame.checked_add(FRAMES as u64).is_none() {
+        if data.len() != SAMPLES * 2 || frame > MAX_FRAME {
             self.stats.invalid += 1;
             return;
         }
@@ -176,7 +179,7 @@ impl JitterBuffer {
         self.packets.insert(frame, pcm);
         self.latest = self.latest.max(frame + FRAMES as u64);
         let cutoff = self.latest.saturating_sub(RATE as u64 / 5);
-        self.packets = self.packets.split_off(&cutoff);
+        self.packets.retain(|frame, _| *frame >= cutoff);
         self.stats.packets += 1;
         self.stats.bytes += PACKET as u64;
     }
@@ -231,8 +234,8 @@ impl JitterBuffer {
         }
         self.cursor = Some(c);
         let retain = (c as u64 / FRAMES as u64) * FRAMES as u64;
-        self.packets = self.packets.split_off(&retain);
-        self.missing = self.missing.split_off(&retain);
+        self.packets.retain(|frame, _| *frame >= retain);
+        self.missing.retain(|frame| *frame >= retain);
         self.stats.buffer_ms = (self.latest as f64 - c).max(0.0) / 48.0;
         self.stats.peak = output
             .iter()
@@ -318,5 +321,83 @@ mod tests {
         assert!(j.stats.drift_ppm > 0.0);
         assert_eq!(j.stats.rebuffers, 0);
         assert!(j.stats.buffer_ms < 80.0);
+    }
+
+    #[test]
+    fn slower_source_clock_remains_bounded() {
+        let mut j = JitterBuffer::new(60);
+        fill(&mut j, 0, 13);
+        let mut seq = 13;
+        for tick in 0..30_000 {
+            if tick % 1000 != 0 {
+                fill(&mut j, seq, 1);
+                seq += 1;
+            }
+            j.render(&mut [0; SAMPLES]);
+        }
+        assert!(j.stats.drift_ppm < 0.0);
+        assert_eq!(j.stats.rebuffers, 0);
+        assert!(j.stats.buffer_ms > 10.0 && j.stats.buffer_ms < 100.0);
+    }
+
+    #[test]
+    fn target_changes_refill_and_trim_without_growing_a_queue() {
+        let mut j = JitterBuffer::new(20);
+        fill(&mut j, 0, 6);
+        let mut output = [0; SAMPLES];
+        j.render(&mut output);
+        j.set_target(120);
+        j.render(&mut output);
+        assert!(output.iter().all(|sample| *sample == 0));
+        fill(&mut j, 6, 30);
+        j.render(&mut output);
+        assert!(output.iter().all(|sample| *sample != 0));
+        assert!(j.stats.buffer_ms <= 120.0);
+        j.set_target(1);
+        j.render(&mut output);
+        assert_eq!(j.stats.target_ms, 20);
+        assert!(j.stats.buffer_ms <= 20.0);
+        assert!(j.stats.trims > 0);
+    }
+
+    #[test]
+    fn stereo_order_and_missing_packets_are_counted_once() {
+        let mut j = JitterBuffer::new(40);
+        let mut pcm = [0_u8; SAMPLES * 2];
+        for frame in pcm.chunks_exact_mut(4) {
+            frame[..2].copy_from_slice(&1234_i16.to_le_bytes());
+            frame[2..].copy_from_slice(&(-2345_i16).to_le_bytes());
+        }
+        for n in 0..10 {
+            j.insert(n * FRAMES as u64, &pcm);
+        }
+        j.packets.remove(&(4 * FRAMES as u64));
+        j.packets.remove(&(5 * FRAMES as u64));
+        let mut output = [0; SAMPLES];
+        j.render(&mut output);
+        assert_eq!(output[0], 1234);
+        assert_eq!(output[1], -2345);
+        for _ in 0..5 {
+            j.render(&mut output);
+        }
+        assert_eq!(j.stats.lost, 2);
+    }
+
+    #[test]
+    fn rejects_overflowing_timestamps_and_wrong_format() {
+        let mut p = packet(u64::MAX / FRAMES as u64 * FRAMES as u64);
+        assert!(decode(&p).is_none());
+        p = packet((u64::MAX / FRAMES as u64 - 2) * FRAMES as u64);
+        assert!(decode(&p).is_none());
+        p = packet(0);
+        p[6] = 1;
+        assert!(decode(&p).is_none());
+        p = packet(0);
+        p[7] = 2;
+        assert!(decode(&p).is_none());
+        let mut j = JitterBuffer::new(60);
+        j.insert(u64::MAX, &[0; SAMPLES * 2]);
+        assert_eq!(j.stats.invalid, 1);
+        assert!(j.packets.is_empty());
     }
 }

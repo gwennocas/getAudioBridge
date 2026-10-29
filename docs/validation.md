@@ -31,7 +31,7 @@ Use uma interface/gravador com dois canais simultâneos. Grave um impulso/estalo
 
 Gravação acústica com microfone também é possível, mas inclui distância dos transdutores, propagação e processamento do microfone. Ping/RTT ou timestamps de datagramas não substituem esse ensaio. Esta implementação não tem sincronização de relógios de parede nem declara um valor de latência ponta a ponta.
 
-## Registro desta execução
+## Registro da prévia v0.1.0-alpha.1
 
 Validado em **29/10/2026**, Windows no endereço LAN `192.168.1.2` (Ethernet) e Moto G7 Plus com **Android 15**, Wi-Fi 2,4 GHz e fone com fio. O Android reportou rota **`h2w (tipo 4)`**, e o usuário confirmou que estava ouvindo o áudio. O USB foi usado somente por ADB/diagnóstico, sem encaminhar o áudio UDP.
 
@@ -45,3 +45,26 @@ Validado em **29/10/2026**, Windows no endereço LAN `192.168.1.2` (Ethernet) e 
 - Foi necessária regra de firewall limitada ao executável debug, UDP 45150, PC `192.168.1.2` e celular `192.168.1.4`. Um bloqueio UDP público criado automaticamente para o mesmo executável foi desativado por conflitar com essa permissão. O firewall permaneceu ativo; outras regras não foram alteradas. A regra vale para o caminho do executável testado, não automaticamente para cópias em outra pasta.
 
 Não realizados: medição física por gravador/interface, teste de 30–60 minutos de drift em hardware, qualificação de diferentes aparelhos, adaptador USB-C e distribuição release assinada. O material entregue é uma primeira versão funcional e testada com builds de desenvolvimento.
+
+## Distribuição v0.1.0
+
+Validada em **29/10/2026**, em Windows 10 Pro 22H2/build 19045 e Moto G7 Plus/Android 15 com fone com fio. O usuário confirmou áudio normal no aparelho após instalar o APK otimizado e assinado com chave própria.
+
+Artefatos de distribuição:
+
+- Instalador Windows x64 NSIS por usuário: aproximadamente 1,9 MB, perfil Rust release. A instalação silenciosa retornou sucesso. O hash do executável instalado foi comparado ao executável extraído do próprio instalador e coincidiu.
+- APK Android arm64: aproximadamente 9,85 MB, release otimizado por Rust/R8, pacote `app.getaudiobridge.mobile`, versão `0.1.0`, `versionCode=1001`, minSdk 26, targetSdk 36 e sem flag `DEBUGGABLE`.
+- APK verificado pelo Android SDK: assinatura v2 válida, RSA 3072, certificado `CN=getAudioBridge`, SHA-256 do certificado `651518cb1710c9a6821a832ff2c1b4b118a7cf62b10265c71de8cc460f6f313e`. A chave privada permanece fora do repositório.
+- Migração da prévia debug por reinstalação inicial, reaplicando IP/porta/buffer. Uma atualização posterior entre dois APKs release com a chave própria foi instalada sobre a anterior com sucesso, preservando essas configurações.
+
+**11 testes automatizados aprovados** (`cargo test --workspace --all-targets`): nove testes do protocolo/buffer, um teste de integração UDP e um teste Windows de erros UDP temporários. A cobertura inclui relógio de origem mais rápido e mais lento, estéreo, troca de alvo de buffer e rejeição de timestamps extremos. Compilação TypeScript e formatação Rust verificadas.
+
+Teste do Windows instalado: datagramas de controle inválidos e maiores que o buffer não encerraram a captura; porta ocupada produziu erro recuperável; depois de liberar a porta, transmissão e conexão Android voltaram. [Relatório Windows](windows-stable-smoke.json).
+
+No APK release foram verificados pela interface e logs nativos: conexão, alvos de 20/120/60 ms, reconexão, recuperação após reinício do PC e parada ao enviar o Android para HOME. Após sair, o Windows voltou ao estado de espera sem cliente; ao retornar, o Android exigiu nova conexão. A instalação da distribuição não habilita debugging de WebView; métricas extras de log foram ativadas somente durante a qualificação.
+
+Trecho contínuo com os artefatos finais, alvo de 60 ms e rota `h2w (tipo 4)`: **212 segundos**, 107 amostras nativas e 42.397 pacotes recebidos no intervalo. Foram registrados **0 pacotes ausentes no consumo, 0 cortes de backlog, 0 underruns AudioTrack, 1 rebufferização do jitter buffer e nenhum erro de estado**. Fila nativa: 480 frames/10 ms. Ocupação Rust observada: aproximadamente 38,5–60 ms. [Métricas do trecho](stable-hardware-observation.json).
+
+A rebufferização está registrada e não equivale a um underrun do AudioTrack. O teste não promete ausência de falhas em outras condições; buffers maiores podem ser necessários em redes com pausas maiores. Esses valores são filas e indicadores internos, não latência física até o fone. Permanecem fora desta qualificação: medição física por gravador/interface, ensaio de 30–60 minutos, outros aparelhos e adaptador USB-C.
+
+A versão estável cobre o escopo inicial de transmissão local com o Android aberto. O executável/instalador Windows continua sem certificado comercial de editor; isso é independente da assinatura própria validada no APK. Foram mantidas regras de firewall limitadas ao executável instalado, porta UDP e ao PC/celular deste ensaio.
