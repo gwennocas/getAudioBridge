@@ -1,5 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import './style.css';
+import { partialLatencyMs } from './latency';
 
 type Stream = {state:string; error:string|null; packets:number; bytes:number; lost:number; late:number; duplicates:number; invalid:number; rebuffers:number; trims:number; bufferMs:number; targetMs:number; driftPpm:number; jitterMs:number; peer:string|null;peak:number};
 type Output = {running:boolean; paused?:boolean; backgroundService?:boolean; wakeLockHeld?:boolean; wifiLockHeld?:boolean; selectedOutput?:string; speakerAvailable?:boolean; headphonesAvailable?:boolean; error:string|null; writes:number; underruns:number; queuedMs:number; route:string; bufferFrames:number; lowLatency:boolean; timestampAvailable:boolean; hardwareQueueMs:number};
@@ -47,11 +48,12 @@ $('app').innerHTML = `
     <div class="activity" id="activity"><div class="activity-ring">${icon(mobile?'headphones':'wave')}</div><strong id="activity-title">${mobile?'Pronto para ouvir':'Pronto para transmitir'}</strong><p id="activity-description">${mobile?'Conecte para receber o áudio do Windows.':'Inicie e conecte o aplicativo no Android.'}</p></div>
     <div class="metrics"><div><small>${mobile?'Buffer atual':'Tráfego de áudio'}</small><strong id="metric-a">—</strong></div><div><small>${mobile?'Falhas AudioTrack':'Pacotes enviados'}</small><strong id="metric-b">—</strong></div><div><small>${mobile?'Pacotes ausentes':'Descartes no envio'}</small><strong id="metric-c">—</strong></div><div><small>${mobile?'Variação de chegada':'Formato'}</small><strong id="metric-d">${mobile?'—':'PCM 16-bit'}</strong></div></div>
     <div class="buffer-meter" ${mobile?'':'hidden'}><div><span>Ocupação do buffer</span><span id="buffer-meter-label">—</span></div><progress id="buffer-meter" max="160" value="0"></progress></div>
+    ${mobile?`<div class="latency-summary"><span>Buffer atual + saída estimada pelo Android</span><strong id="partial-latency">Indisponível</strong><p id="latency-components">Aguardando reprodução e informação de saída do Android.</p><p>Estimativa parcial. Não mede o atraso total do PC até o fone; não inclui captura/rede nem atraso interno do fone.</p><p>Bluetooth pode acrescentar atraso dependendo do codec, aparelho e fone, inclusive causando dessincronia com vídeo.</p></div>`:''}
     <details><summary>Detalhes técnicos</summary><dl id="technical"><dt>Transporte</dt><dd>UDP · IPv4</dd><dt>Áudio</dt><dd>48.000 Hz · 2 canais · PCM16</dd><dt>Pacote</dt><dd>240 frames · 5 ms</dd></dl></details>
    </section>
   </div>
   <aside class="tip"><span class="tip-number">i</span><p>${mobile?'<b>Continue ouvindo com a tela bloqueada.</b> O áudio permanece ativo ao trocar de app ou fechar esta janela. Para encerrar, use Desconectar aqui ou nos controles de mídia. O buffer não representa a latência total até o fone.':'<b>Na mesma rede, do início ao fim.</b> Abra o app no Android, informe o IP deste PC e conecte. Se não houver conexão, permita a porta UDP no firewall e verifique o isolamento de clientes do roteador.'}</p></aside>
- </main><footer><span>getAudioBridge <small>v0.2</small></span><span>Áudio local. Conexão direta.</span></footer>
+ </main><footer><span>getAudioBridge <small>v0.2.1</small></span><span>Áudio local. Conexão direta.</span></footer>
 </div>`;
 
 const ipInput = $<HTMLInputElement|HTMLSelectElement>('ip');
@@ -149,6 +151,9 @@ async function poll() {
     if (mobile) {
       $<HTMLProgressElement>('buffer-meter').value = s.bufferMs;
       $('buffer-meter-label').textContent = `${s.bufferMs.toFixed(0)} / ${s.targetMs || $<HTMLInputElement>('buffer').value} ms alvo`;
+      const partial = partialLatencyMs(s.bufferMs,o?.hardwareQueueMs,!!o?.timestampAvailable,playing);
+      $('partial-latency').textContent = partial === null ? 'Indisponível' : `≈ ${partial.toFixed(1)} ms`;
+      $('latency-components').textContent = partial === null ? (active ? 'O Android ainda não forneceu uma estimativa de saída válida nesta rota.' : 'Aguardando reprodução e informação de saída do Android.') : `${s.bufferMs.toFixed(1)} ms no buffer + ${o!.hardwareQueueMs.toFixed(1)} ms até a apresentação reportada. Amostras aproximadas.`;
       const rows: [string,string][] = [['Pacotes recebidos',String(s.packets)],['Atrasados / duplicados',`${s.late} / ${s.duplicates}`],['Rebufferizações / cortes',`${s.rebuffers} / ${s.trims}`],['Correção de relógio',`${s.driftPpm.toFixed(0)} ppm`],['Fila AudioTrack',`${(o?.queuedMs || 0).toFixed(1)} ms`],['Buffer nativo',`${o?.bufferFrames || 0} frames`],['Modo de baixa latência',o?.lowLatency?'Ativo':'Não concedido'],['Timestamp de áudio',o?.timestampAvailable?`${o.hardwareQueueMs.toFixed(1)} ms em fila`:'Indisponível'],['Pacotes inválidos',String(s.invalid)]];
       rows.unshift(['Pico PCM',s.peak > 0 ? `${(20*Math.log10(s.peak)).toFixed(1)} dBFS` : 'Silêncio']);
       rows.push(['Serviço em segundo plano',o?.backgroundService?'Ativo':'Parado']);

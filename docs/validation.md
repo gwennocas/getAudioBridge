@@ -1,5 +1,13 @@
 # Validação e medição
 
+## v0.2.1 — estimativa parcial e aviso de Bluetooth
+
+O indicador soma o buffer Rust atual à estimativa de fila obtida com `AudioTrack.getTimestamp`. O cálculo considera a posição em frames, o tempo monotônico da apresentação e o wrap de 32 bits; corrige a idade do timestamp em vez de contar frames já apresentados. Não soma novamente a fila calculada pelo playback head. Dados ausentes, inconsistentes ou antigos são rejeitados, e a interface mostra `Indisponível` quando a reprodução/estimativa não está válida. A estimativa é invalidada ao trocar a rota e expira quando deixa de ser atualizada.
+
+Isso não é uma API universal de latência do dispositivo e não mede o atraso físico até o fone: consulte [AudioTimestamp](https://developer.android.com/reference/android/media/AudioTimestamp) e [os limites de medição do Android](https://developer.android.com/ndk/guides/audio/audio-latency). A interface e a release avisam que Bluetooth pode acrescentar atraso conforme codec, aparelho e fone, inclusive afetando vídeo. Nenhuma latência de codec foi atribuída sem medição.
+
+Verificado em 31/10/2026: **5 testes JVM/Kotlin** (`:tauri-plugin-audio-output:testDebugUnitTest`) e **2 testes da interface** (`node --experimental-strip-types --test scripts/latency.test.mjs`) passaram. Os casos incluem timestamp antigo/futuro, wrap, origem do relógio, relatórios inválidos, ocupação real do buffer e indicação de indisponibilidade. Compilação TypeScript e APK release/R8/lint aprovados. O SDK confirmou versão `0.2.1`, `versionCode=2001`, minSdk 26, targetSdk 36, sem `DEBUGGABLE`, com a mesma assinatura própria das versões anteriores. O celular saiu do ADB antes da instalação; o novo indicador não foi requalificado fisicamente nesta versão. Os testes em aparelho da v0.2.0 abaixo permanecem identificados como tal.
+
 ## v0.2.0 — reprodução em segundo plano e seleção de saída
 
 O APK release arm64 foi compilado com Rust e Kotlin, empacotado com R8 e aprovado nas tarefas `lintVitalArm64Release`. Em 31/10/2026, a verificação do pacote confirmou versão `0.2.0`, `versionCode=2000`, minSdk 26, targetSdk 36, sem `DEBUGGABLE`, e assinatura válida com o mesmo certificado próprio da v0.1.0. Os 11 testes Rust e a compilação TypeScript passaram durante a implementação.

@@ -4,7 +4,7 @@
 
 ## Download
 
-[Baixar Android v0.2.0](https://github.com/gwennocas/getAudioBridge/releases/tag/v0.2.0) · [Baixar Windows v0.1.0](https://github.com/gwennocas/getAudioBridge/releases/tag/v0.1.0).
+[Baixar Android v0.2.1](https://github.com/gwennocas/getAudioBridge/releases/tag/v0.2.1) · [Baixar Windows v0.1.0](https://github.com/gwennocas/getAudioBridge/releases/tag/v0.1.0).
 
 A v0.2.0 adiciona reprodução Android em segundo plano/tela bloqueada e seleção entre alto-falante e fone com fio/USB. O APK arm64 é otimizado, assinado com a mesma chave própria da v0.1.0 e não depurável. Ele é compatível com o transmissor Windows v0.1.0, que permanece disponível na release anterior. O instalador Windows x64 não tem certificado comercial de editor e requer WebView2, que pode ser instalado quando estiver ausente.
 
@@ -21,6 +21,8 @@ Se você instalou a prévia debug `v0.1.0-alpha.1`, guarde IP, porta e buffer, d
 Na **v0.2.0**, o Android mantém o áudio em um serviço de mídia: você pode trocar de aplicativo, apagar/bloquear a tela e remover a janela dos recentes. Para encerrar, use **Desconectar** no aplicativo ou nos controles de mídia da notificação/tela bloqueada (o botão de pausa também desconecta). A tela pode apagar normalmente. Ao reabrir o aplicativo, os controles mostram a sessão existente.
 
 O serviço mantém a CPU ativa durante a sessão e solicita uma otimização de Wi-Fi, liberando esses recursos ao desconectar. Chamadas e outros aplicativos podem interromper o áudio conforme as regras de foco do Android; interrupções temporárias retomam quando o sistema devolve o foco, e os controles de mídia permitem retomar uma sessão pausada. Encerrar à força, reiniciar o aparelho ou restrições impostas pelo sistema podem parar o aplicativo. A rota de saída é controlada pelo Android; a saída realmente usada aparece no monitor.
+
+Na v0.2.1, o monitor mostra **buffer atual + saída estimada pelo Android**, quando há um timestamp de apresentação válido. A soma usa a ocupação atual do buffer Rust, não o alvo configurado, e a fila estimada até a apresentação reportada pelo Android; não adiciona a fila AudioTrack novamente. É uma estimativa parcial, com amostras independentes: não mede captura/rede nem o atraso interno do fone. Sem informação válida, mostra **Indisponível**. **Bluetooth pode acrescentar atraso dependendo do codec, aparelho e fone, especialmente perceptível com vídeo**; não há sincronização automática com o vídeo do PC.
 
 Se não conectar: confirme IP/porta, evite rede de convidados/isolamento de clientes e permita entrada UDP na porta escolhida no Firewall do Windows, somente em rede confiável. O programa não modifica automaticamente o firewall. Uma conexão USB não transporta áudio nesta versão.
 

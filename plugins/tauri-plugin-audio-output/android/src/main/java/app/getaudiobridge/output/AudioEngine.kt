@@ -45,6 +45,7 @@ internal class AudioEngine(context: Context, private val changed: () -> Unit, pr
     private var deviceCallbackRegistered = false
     @Volatile private var desiredBufferFrames = 480
     private val routing = AudioRouting.OnRoutingChangedListener { output -> PlaybackControl.execute {
+        timestampAvailable = false
         // Android can recreate an AudioTrack with a much larger queue when changing devices.
         if (running.get() && track === output) track?.setBufferSizeInFrames(desiredBufferFrames)
     } }
@@ -64,6 +65,7 @@ internal class AudioEngine(context: Context, private val changed: () -> Unit, pr
     @Volatile private var queuedMs = 0.0
     @Volatile private var timestampAvailable = false
     @Volatile private var hardwareQueueMs = 0.0
+    @Volatile private var estimateAtNs = 0L
     @Volatile private var route = "Saída do sistema"
     @Volatile private var bufferIncreases = 0
 
@@ -137,8 +139,12 @@ internal class AudioEngine(context: Context, private val changed: () -> Unit, pr
                 queuedMs = maxOf(0.0, (framesWritten - headWrap - raw).toDouble() / 48.0)
                 if (writes % 100L == 0L) {
                     route = audio.routedDevice?.let { "${it.productName} (tipo ${it.type})" } ?: "Saída do sistema"
-                    timestampAvailable = audio.getTimestamp(stamp)
-                    if (timestampAvailable) hardwareQueueMs = maxOf(0.0, (framesWritten - stamp.framePosition).toDouble() / 48.0)
+                    val now = System.nanoTime()
+                    val estimate = if (audio.getTimestamp(stamp)) PresentationEstimate.milliseconds(
+                        framesWritten, headWrap + raw, stamp.framePosition, stamp.nanoTime, now) else null
+                    hardwareQueueMs = estimate ?: 0.0
+                    estimateAtNs = now
+                    timestampAvailable = estimate != null
                     if (writes % 400L == 0L && Log.isLoggable("getAudioBridge", Log.DEBUG)) {
                         Log.d("getAudioBridge", "writes=$writes queuedMs=$queuedMs underruns=${audio.underrunCount} bufferFrames=${audio.bufferSizeInFrames} route=$route metrics=${AudioOutputPlugin.nativeStats()}")
                     }
@@ -167,6 +173,7 @@ internal class AudioEngine(context: Context, private val changed: () -> Unit, pr
         put("underruns", track?.underrunCount ?: 0); put("queuedMs", queuedMs); put("route", route)
         put("bufferFrames", track?.bufferSizeInFrames ?: 0); put("bufferIncreases", bufferIncreases)
         put("lowLatency", track?.performanceMode == AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
-        put("timestampAvailable", timestampAvailable); put("hardwareQueueMs", hardwareQueueMs)
+        put("timestampAvailable", timestampAvailable && running.get() && !paused.get() && System.nanoTime() - estimateAtNs < 2_000_000_000L)
+        put("hardwareQueueMs", hardwareQueueMs)
     }
 }
