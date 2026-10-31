@@ -53,7 +53,8 @@ $('app').innerHTML = `
    </section>
   </div>
   <aside class="tip"><span class="tip-number">i</span><p>${mobile?'<b>Continue ouvindo com a tela bloqueada.</b> O áudio permanece ativo ao trocar de app ou fechar esta janela. Para encerrar, use Desconectar aqui ou nos controles de mídia. O buffer não representa a latência total até o fone.':'<b>Na mesma rede, do início ao fim.</b> Abra o app no Android, informe o IP deste PC e conecte. Se não houver conexão, permita a porta UDP no firewall e verifique o isolamento de clientes do roteador.'}</p></aside>
- </main><footer><span>getAudioBridge <small>v0.2.1</small></span><span>Áudio local. Conexão direta.</span></footer>
+  ${mobile?`<section class="panel app-updates"><h2>Atualizações</h2><p id="update-message" role="status" aria-live="polite">Busque novas versões oficiais no GitHub.</p><button type="button" id="update-action" class="primary" disabled>Verificar atualização</button><button type="button" id="update-extra" class="update-extra" hidden>Verificar novamente</button><p class="hint">Apenas a atualização precisa de internet. A instalação encerra a sessão de áudio e exige sua confirmação no Android.</p></section>`:''}
+ </main><footer><span>getAudioBridge <small>v0.2.2</small></span><span>Áudio local. Conexão direta.</span></footer>
 </div>`;
 
 const ipInput = $<HTMLInputElement|HTMLSelectElement>('ip');
@@ -166,6 +167,31 @@ async function poll() {
 }
 if (!native) showError('Prévia da interface. Abra o aplicativo Tauri para capturar ou reproduzir áudio.');
 controls(); await poll();
+type UpdateState = {phase:string;installed:string;version:string;size:number;downloaded?:number;total?:number;error?:string;canInstall?:boolean};
+let updateState: UpdateState|null = null, updateBusy = false, updateError:string|null = null;
+function renderUpdate() {
+  const s = updateState, button = $<HTMLButtonElement>('update-action'), extra = $<HTMLButtonElement>('update-extra');
+  const downloading = s?.phase === 'downloading';
+  button.disabled = !native || updateBusy || downloading;
+  button.textContent = updateBusy ? 'Aguarde…' : downloading ? 'Baixando…' : s?.phase === 'ready' ? 'Instalar atualização' : s?.phase === 'available' ? `Baixar v${s.version} (${(s.size/1048576).toFixed(1)} MB)` : 'Verificar atualização';
+  extra.hidden = !s?.version || downloading; extra.disabled = updateBusy;
+  extra.textContent = s?.phase === 'current' && s.version === s.installed ? 'Baixar APK novamente' : 'Verificar novamente';
+  $('update-message').textContent = s?.error || (downloading ? `Download: ${Math.max(0,Math.min(100,(s?.downloaded || 0)/Math.max(1,s?.total || s?.size || 1)*100)).toFixed(0)}%` : s?.phase === 'ready' ? (s.canInstall ? 'APK baixado. Toque para verificar e abrir o instalador.' : 'APK baixado. Ao instalar, autorize esta fonte no Android e volte para tocar em Instalar novamente.') : s?.phase === 'available' ? `Nova versão: ${s.version}. Você usa ${s.installed}.` : s?.phase === 'current' ? `Você usa a versão mais recente: ${s.installed}.` : 'Busque novas versões oficiais no GitHub.');
+}
+async function updateAction(action:string) {
+  if (updateBusy || !native) return;
+  updateBusy = true; if (action !== 'status') { updateError = null; renderUpdate(); }
+  try { updateState = await invoke<UpdateState>('app_update',{action}); }
+  catch(e) { updateError = String(e); }
+  finally { updateBusy = false; renderUpdate(); if (updateError) $('update-message').textContent = updateError; }
+}
+if (mobile) {
+  $('update-action').onclick = () => updateAction(updateState?.phase === 'available' ? 'download' : updateState?.phase === 'ready' ? 'install' : 'check');
+  $('update-extra').onclick = () => updateAction(updateState?.phase === 'current' && updateState.version === updateState.installed ? 'download' : 'check');
+  void updateAction('status');
+  async function updateProgress() { if (!updateBusy && ['downloading','ready'].includes(updateState?.phase || '')) await updateAction('status'); setTimeout(updateProgress,2000); }
+  setTimeout(updateProgress,2000);
+}
 // A new poll starts only after the previous one finishes, preventing IPC buildup.
 async function refreshLoop() { await poll(); setTimeout(refreshLoop,600); }
 setTimeout(refreshLoop,600);

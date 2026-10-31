@@ -165,6 +165,25 @@ pub async fn set_output(app: AppHandle, output: String) -> Result<(), String> {
     }
 }
 #[tauri::command]
+pub async fn app_update(app: AppHandle, action: String) -> Result<serde_json::Value, String> {
+    #[cfg(target_os = "android")]
+    {
+        let command = match action.as_str() {
+            "status" => "updateStatus",
+            "check" => "updateCheck",
+            "download" => "updateDownload",
+            "install" => "updateInstall",
+            _ => return Err("Ação de atualização inválida".into()),
+        };
+        output(&app, command)
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = (app, action);
+        Err("Atualize o Android pelo celular".into())
+    }
+}
+#[tauri::command]
 pub async fn status(app: AppHandle, state: State<'_, AppState>) -> Result<Status, String> {
     #[cfg(windows)]
     {

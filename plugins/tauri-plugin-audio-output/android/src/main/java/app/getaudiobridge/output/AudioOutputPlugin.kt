@@ -5,6 +5,7 @@ import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
+import app.tauri.plugin.JSObject
 import java.nio.ByteBuffer
 
 @InvokeArg
@@ -63,4 +64,11 @@ class AudioOutputPlugin(host: Activity) : app.tauri.plugin.Plugin(host) {
     }
 
     // Activity pause/destruction deliberately has no playback side effects.
+    private fun update(invoke: Invoke, action: () -> JSObject) { AppUpdates.execute {
+        try { invoke.resolve(action()) } catch (e: Exception) { invoke.reject(e.message ?: "Falha na atualização") }
+    } }
+    @Command fun updateStatus(invoke: Invoke) { update(invoke) { AppUpdates.status(context) } }
+    @Command fun updateCheck(invoke: Invoke) { update(invoke) { AppUpdates.checkForUpdate(context) } }
+    @Command fun updateDownload(invoke: Invoke) { update(invoke) { AppUpdates.download(context) } }
+    @Command fun updateInstall(invoke: Invoke) { update(invoke) { AppUpdates.install(context) } }
 }

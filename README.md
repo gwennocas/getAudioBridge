@@ -4,7 +4,7 @@
 
 ## Download
 
-[Baixar Android v0.2.1](https://github.com/gwennocas/getAudioBridge/releases/tag/v0.2.1) · [Baixar Windows v0.1.0](https://github.com/gwennocas/getAudioBridge/releases/tag/v0.1.0).
+[Baixar Android v0.2.2](https://github.com/gwennocas/getAudioBridge/releases/tag/v0.2.2) · [Baixar Windows v0.1.0](https://github.com/gwennocas/getAudioBridge/releases/tag/v0.1.0).
 
 A v0.2.0 adiciona reprodução Android em segundo plano/tela bloqueada e seleção entre alto-falante e fone com fio/USB. O APK arm64 é otimizado, assinado com a mesma chave própria da v0.1.0 e não depurável. Ele é compatível com o transmissor Windows v0.1.0, que permanece disponível na release anterior. O instalador Windows x64 não tem certificado comercial de editor e requer WebView2, que pode ser instalado quando estiver ausente.
 
@@ -25,6 +25,12 @@ O serviço mantém a CPU ativa durante a sessão e solicita uma otimização de 
 Na v0.2.1, o monitor mostra **buffer atual + saída estimada pelo Android**, quando há um timestamp de apresentação válido. A soma usa a ocupação atual do buffer Rust, não o alvo configurado, e a fila estimada até a apresentação reportada pelo Android; não adiciona a fila AudioTrack novamente. É uma estimativa parcial, com amostras independentes: não mede captura/rede nem o atraso interno do fone. Sem informação válida, mostra **Indisponível**. **Bluetooth pode acrescentar atraso dependendo do codec, aparelho e fone, especialmente perceptível com vídeo**; não há sincronização automática com o vídeo do PC.
 
 Se não conectar: confirme IP/porta, evite rede de convidados/isolamento de clientes e permita entrada UDP na porta escolhida no Firewall do Windows, somente em rede confiável. O programa não modifica automaticamente o firewall. Uma conexão USB não transporta áudio nesta versão.
+
+## Atualizar pelo Android
+
+No fim da tela, em **Atualizações**, toque em **Verificar atualização**, depois **Baixar** e **Instalar atualização**. O download aparece nas notificações do Android. Na primeira instalação por esse caminho, o Android pode pedir que você autorize o getAudioBridge como fonte de instalação; volte ao aplicativo e toque em Instalar novamente. A instalação exige confirmação do sistema e encerra a sessão de áudio. Também é possível baixar novamente o APK da versão atual.
+
+A consulta ocorre somente ao tocar no botão e usa a última release estável deste repositório no GitHub. Antes de abrir o instalador, o app confere SHA-256, tamanho, nome do pacote, assinatura da versão instalada e impede downgrade. Atualizações precisam de internet; a transmissão local continua independente de internet.
 
 ## Compilar
 

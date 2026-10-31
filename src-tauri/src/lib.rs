@@ -26,6 +26,7 @@ pub fn run() {
             commands::disconnect,
             commands::set_buffer,
             commands::set_output,
+            commands::app_update,
             commands::status
         ])
         .build(tauri::generate_context!())

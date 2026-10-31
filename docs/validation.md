@@ -1,5 +1,11 @@
 # Validação e medição
 
+## v0.2.2 — atualização manual pelo Android
+
+Adicionada consulta manual à última release estável do repositório oficial, download pelo DownloadManager e abertura do instalador Android com confirmação do usuário. A consulta não ocorre automaticamente. O APK é conferido por tamanho, SHA-256 publicado pelo GitHub, pacote, assinatura atual e versionCode antes de ser servido ao instalador por um URI de FileProvider da cópia verificada em cache privado. Não há instalação silenciosa ou autorização automática de fontes desconhecidas.
+
+Em 31/10/2026 passaram **11 testes Rust, 7 testes Kotlin (5 de estimativa e 2 de política de atualização) e 2 testes TypeScript**, além de compilação/R8/lint do APK release. Os testes de política cobrem comparação numérica, rejeição de prereleases, domínio/repositório/arquivo fixados, exigência de HTTPS e digest obrigatório. APK `0.2.2`, `versionCode=2002`, sem `DEBUGGABLE`, assinado com a mesma chave própria. A atualização foi instalada sobre a anterior pelo ADB no Moto G7 Plus, preservando dados. A seção Atualizações apareceu e a consulta real ao GitHub funcionou durante a reprodução de áudio. O indicador parcial também foi observado funcionando em aparelho nesta versão (por exemplo, buffer 55,1 ms + apresentação estimada 36,8 ms = 91,9 ms, sem representar latência física).
+
 ## v0.2.1 — estimativa parcial e aviso de Bluetooth
 
 O indicador soma o buffer Rust atual à estimativa de fila obtida com `AudioTrack.getTimestamp`. O cálculo considera a posição em frames, o tempo monotônico da apresentação e o wrap de 32 bits; corrige a idade do timestamp em vez de contar frames já apresentados. Não soma novamente a fila calculada pelo playback head. Dados ausentes, inconsistentes ou antigos são rejeitados, e a interface mostra `Indisponível` quando a reprodução/estimativa não está válida. A estimativa é invalidada ao trocar a rota e expira quando deixa de ser atualizada.
