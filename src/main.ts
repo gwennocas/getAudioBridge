@@ -2,7 +2,7 @@ import { invoke, isTauri } from '@tauri-apps/api/core';
 import './style.css';
 
 type Stream = {state:string; error:string|null; packets:number; bytes:number; lost:number; late:number; duplicates:number; invalid:number; rebuffers:number; trims:number; bufferMs:number; targetMs:number; driftPpm:number; jitterMs:number; peer:string|null;peak:number};
-type Output = {running:boolean; error:string|null; writes:number; underruns:number; queuedMs:number; route:string; bufferFrames:number; lowLatency:boolean; timestampAvailable:boolean; hardwareQueueMs:number};
+type Output = {running:boolean; paused?:boolean; backgroundService?:boolean; wakeLockHeld?:boolean; wifiLockHeld?:boolean; selectedOutput?:string; speakerAvailable?:boolean; headphonesAvailable?:boolean; error:string|null; writes:number; underruns:number; queuedMs:number; route:string; bufferFrames:number; lowLatency:boolean; timestampAvailable:boolean; hardwareQueueMs:number};
 type Status = {stream:Stream; output:Output|null};
 const icons = {
   wave: '<path d="M3 10v4m4-8v12m5-16v20m5-16v12m4-8v4"/>',
@@ -21,6 +21,7 @@ let mobile = /Android/i.test(navigator.userAgent);
 if (native) mobile = await invoke<string>('platform') === 'android';
 let active = false, busy = false, previous: {bytes:number; time:number}|null = null;
 let lastBackendError: string | null = null;
+let routingBusy = false, latestOutput: Output|null = null;
 const saved = (key:string, fallback:string) => localStorage.getItem(`gab-${key}`) || fallback;
 
 $('app').innerHTML = `
@@ -37,6 +38,7 @@ $('app').innerHTML = `
     <p id="address-hint" class="hint">${mobile?'Use o endereço exibido no getAudioBridge do Windows.':'No Android, informe um dos IPs deste computador.'}</p>
     ${mobile?`<div class="buffer-control"><div><label for="buffer">Buffer de reprodução</label><output id="buffer-value" for="buffer">60 <small>ms</small></output></div><input id="buffer" type="range" min="20" max="120" step="5" value="60"/><div class="range-labels"><span>Menor atraso</span><span>Maior estabilidade</span></div></div>`:''}
     <button id="toggle" class="primary" type="submit">${icon('play')}<span>${mobile?'Conectar ao computador':'Iniciar transmissão'}</span></button>
+    ${mobile?`<fieldset class="output-control"><legend>Saída de áudio</legend><div class="output-buttons" role="group" aria-label="Saída de áudio"><button type="button" data-output="system" aria-pressed="true" disabled>Sistema</button><button type="button" data-output="speaker" aria-pressed="false" disabled>Alto-falante</button><button type="button" data-output="headphones" aria-pressed="false" disabled>Fone / USB</button></div><p class="hint" id="output-hint">Conecte um fone com fio ou USB para habilitar a opção.</p><p class="hint" id="output-route" aria-live="polite"></p></fieldset>`:''}
     <div id="error" role="alert" hidden></div>
     </form>
     <div class="local-note">${icon('shield')}<span>Conexão direta na sua rede. Sem nuvem e sem conta.</span></div>
@@ -48,8 +50,8 @@ $('app').innerHTML = `
     <details><summary>Detalhes técnicos</summary><dl id="technical"><dt>Transporte</dt><dd>UDP · IPv4</dd><dt>Áudio</dt><dd>48.000 Hz · 2 canais · PCM16</dd><dt>Pacote</dt><dd>240 frames · 5 ms</dd></dl></details>
    </section>
   </div>
-  <aside class="tip"><span class="tip-number">i</span><p>${mobile?'<b>O buffer não é a latência total.</b> O atraso também inclui captura, rede, AudioTrack e a saída física. Mantenha o app aberto; ao sair, a reprodução é encerrada.':'<b>Na mesma rede, do início ao fim.</b> Abra o app no Android, informe o IP deste PC e conecte. Se não houver conexão, permita a porta UDP no firewall e verifique o isolamento de clientes do roteador.'}</p></aside>
- </main><footer><span>getAudioBridge <small>v0.1</small></span><span>Áudio local. Conexão direta.</span></footer>
+  <aside class="tip"><span class="tip-number">i</span><p>${mobile?'<b>Continue ouvindo com a tela bloqueada.</b> O áudio permanece ativo ao trocar de app ou fechar esta janela. Para encerrar, use Desconectar aqui ou nos controles de mídia. O buffer não representa a latência total até o fone.':'<b>Na mesma rede, do início ao fim.</b> Abra o app no Android, informe o IP deste PC e conecte. Se não houver conexão, permita a porta UDP no firewall e verifique o isolamento de clientes do roteador.'}</p></aside>
+ </main><footer><span>getAudioBridge <small>v0.2</small></span><span>Áudio local. Conexão direta.</span></footer>
 </div>`;
 
 const ipInput = $<HTMLInputElement|HTMLSelectElement>('ip');
@@ -87,6 +89,23 @@ if (mobile) $<HTMLInputElement>('buffer').oninput = async () => {
   localStorage.setItem('gab-buffer',String(bufferMs));
   if (native) try { await invoke('set_buffer',{bufferMs}); } catch(e) { showError(e); }
 };
+function outputControls(o: Output|null) {
+  if (!mobile) return;
+  for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-output]'))) {
+    const mode = button.dataset.output!;
+    button.setAttribute('aria-pressed',String(mode === (o?.selectedOutput || 'system')));
+    button.disabled = !native || routingBusy || !o || (mode === 'speaker' && !o.speakerAvailable) || (mode === 'headphones' && !o.headphonesAvailable);
+  }
+  $('output-hint').textContent = o?.selectedOutput === 'headphones' && !o.headphonesAvailable ? 'Fone desconectado. O Android está usando a saída do sistema.' : o?.headphonesAvailable ? 'Você pode trocar a saída durante a reprodução.' : 'Conecte um fone com fio ou USB para habilitar a opção.';
+  $('output-route').textContent = o?.running ? `Saída em uso: ${o.route || 'Verificando…'}` : 'A saída escolhida será usada ao conectar.';
+}
+if (mobile) for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-output]'))) button.onclick = async () => {
+  if (routingBusy || !native) return;
+  routingBusy = true; outputControls(latestOutput); showError(null);
+  try { await invoke('set_output',{output:button.dataset.output}); await poll(); }
+  catch (e) { showError(e); }
+  finally { routingBusy = false; outputControls(latestOutput); }
+};
 $('connection-form').onsubmit = async e => {
   e.preventDefault(); if (busy || !native) return; busy = true; controls(); showError(null);
   try {
@@ -110,14 +129,17 @@ async function poll() {
   if (!native) return;
   try {
     const {stream:s,output:o} = await invoke<Status>('status');
-    const playing = mobile ? !!o?.running && s.state === 'receiving' : s.state === 'streaming';
+    latestOutput = o; outputControls(o);
+    const paused = mobile && !!o?.paused;
+    const playing = mobile ? !!o?.running && !paused && s.state === 'receiving' : s.state === 'streaming';
     if (!busy) { active = mobile ? !!o?.running : ['starting','listening','streaming'].includes(s.state); controls(); }
     $('state').classList.toggle('connected',playing);
-    $('state').lastChild!.textContent = labels[s.state] || s.state;
+    $('state').lastChild!.textContent = paused ? 'Áudio pausado' : labels[s.state] || s.state;
     $('activity').classList.toggle('playing',playing);
     $('live-label').textContent = playing?'AO VIVO':active?'AGUARDANDO':'EM ESPERA';
     $('activity-title').textContent = playing?(mobile?'Áudio em reprodução':'Seu áudio está a caminho'):active?(mobile?'Procurando o computador…':'Aguardando conexão…'):(mobile?'Pronto para ouvir':'Pronto para transmitir');
     $('activity-description').textContent = playing?(mobile?(o?.route || 'Saída do sistema'):`Android conectado · ${s.peer}`):active?(mobile?'Verifique se a transmissão está ativa no PC.':'Conecte o Android usando o IP deste computador.'):(mobile?'Conecte para receber o áudio do Windows.':'Inicie e conecte o aplicativo no Android.');
+    if (paused) { $('activity-title').textContent = 'Áudio pausado'; $('activity-description').textContent = 'O sistema priorizou outro áudio. Retome pelos controles de mídia ou desconecte.'; }
     const now = performance.now(); const rate = previous && s.bytes >= previous.bytes ? (s.bytes - previous.bytes)*8/(now-previous.time)/1000 : 0;
     previous = {bytes:s.bytes,time:now};
     textMetric('metric-a',mobile?`${s.bufferMs.toFixed(1)} ms`:`${rate.toFixed(2)} Mbps`);
@@ -129,6 +151,7 @@ async function poll() {
       $('buffer-meter-label').textContent = `${s.bufferMs.toFixed(0)} / ${s.targetMs || $<HTMLInputElement>('buffer').value} ms alvo`;
       const rows: [string,string][] = [['Pacotes recebidos',String(s.packets)],['Atrasados / duplicados',`${s.late} / ${s.duplicates}`],['Rebufferizações / cortes',`${s.rebuffers} / ${s.trims}`],['Correção de relógio',`${s.driftPpm.toFixed(0)} ppm`],['Fila AudioTrack',`${(o?.queuedMs || 0).toFixed(1)} ms`],['Buffer nativo',`${o?.bufferFrames || 0} frames`],['Modo de baixa latência',o?.lowLatency?'Ativo':'Não concedido'],['Timestamp de áudio',o?.timestampAvailable?`${o.hardwareQueueMs.toFixed(1)} ms em fila`:'Indisponível'],['Pacotes inválidos',String(s.invalid)]];
       rows.unshift(['Pico PCM',s.peak > 0 ? `${(20*Math.log10(s.peak)).toFixed(1)} dBFS` : 'Silêncio']);
+      rows.push(['Serviço em segundo plano',o?.backgroundService?'Ativo':'Parado']);
       $('technical').replaceChildren(...rows.flatMap(([k,v])=>{ const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=k;dd.textContent=v;return [dt,dd]; }));
     }
     const backendError = s.error || o?.error || null;

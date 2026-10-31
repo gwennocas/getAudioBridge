@@ -1,5 +1,28 @@
 # Validação e medição
 
+## v0.2.0 — reprodução em segundo plano e seleção de saída
+
+O APK release arm64 foi compilado com Rust e Kotlin, empacotado com R8 e aprovado nas tarefas `lintVitalArm64Release`. Em 31/10/2026, a verificação do pacote confirmou versão `0.2.0`, `versionCode=2000`, minSdk 26, targetSdk 36, sem `DEBUGGABLE`, e assinatura válida com o mesmo certificado próprio da v0.1.0. Os 11 testes Rust e a compilação TypeScript passaram durante a implementação.
+
+O serviço declara `mediaPlayback`, não é exportado e não encerra ao remover a tarefa. Ele mantém receptor UDP/Rust e AudioTrack fora da Activity/WebView, com MediaSession, notificação de desconexão e locks de CPU/Wi-Fi liberados na parada.
+
+O APK foi instalado com `adb install -r` sobre a distribuição anterior, sem desinstalar ou limpar dados. O Android confirmou `versionName=0.2.0` e `versionCode=2000`. O transmissor Windows v0.1.0 foi iniciado e ficou aguardando conexão.
+
+Testes no mesmo Moto G7 Plus/Android 15, conectado por Wi-Fi ao PC Windows 10/Ethernet, com depuração USB e alimentação conectadas:
+
+- IP `192.168.1.2`, porta `45150` e buffer `60 ms` preservados na interface após a atualização.
+- Os botões **Alto-falante**, **Fone / USB** e **Sistema** foram acionados pela interface. A rota nativa mudou para `moto g(7) plus (tipo 2)` e `h2w (tipo 4)`, mesmo com o fone conectado. A seleção é salva no Android.
+- Após trocar de saída, o Android inicialmente recriava uma fila nativa de aproximadamente 80 ms. O listener de roteamento reaplica o tamanho desejado; a nova verificação confirmou **480 frames/10 ms** em ambas as rotas.
+- Reprodução mantida ao ir para HOME e apagar a tela. O sistema reportou `mWakefulness=Dozing`, serviço de mídia em primeiro plano e sessão `PLAYING`; os contadores de escrita e recepção continuaram, incluindo PCM não silencioso gerado no PC.
+- Remoção do cartão dos recentes manteve o áudio. A primeira implementação reabria uma interface vazia; a correção recria a janela Tauri na nova Activity. A interface reaberta mostrou a mesma sessão recebendo áudio.
+- Controles de mídia visíveis na tela bloqueada; a ação de pausa/desconexão da sessão foi testada pelo comando de mídia do Android. Serviço, sessão e locks de CPU/Wi-Fi foram liberados após a parada.
+
+No APK final, a observação de **420 segundos** incluiu troca de saídas, HOME, tela apagada, silêncio e áudio ativo do PC: 84.018 pacotes no intervalo, **1 pacote ausente no consumo, 47 rebufferizações Rust, 12 cortes de backlog e 0 underruns AudioTrack**. A maior parte das rebufferizações foi observada enquanto a origem estava silenciosa; isso não demonstra a causa dessas pausas. [Relatório completo](background-hardware-observation.json).
+
+Um recorte com sinal contínuo do PC, fone com fio e tela apagada durou **128 segundos**: 25.599 pacotes, **1 pacote ausente, 3 rebufferizações, 2 cortes de backlog e 0 underruns AudioTrack**. A fila nativa permaneceu em **480 frames/10 ms**. [Relatório com áudio ativo](background-active-observation.json). O alvo Rust era 60 ms; estes resultados não prometem áudio sem cortes. Aumente para 100–120 ms se a rede/aparelho precisar de mais margem. Filas internas não são a latência física até o fone.
+
+Limites: não houve medição física de latência, ensaio de 30–60 minutos, chamadas telefônicas/interrupções de foco reais, adaptador USB-C, outro fabricante ou teste sem alimentação USB. A seleção de saída usa `AudioTrack.setPreferredDevice`; a rota em uso é consultada separadamente, pois [o Android pode sobrepor a preferência](https://developer.android.com/reference/android/media/AudioRouting). Reinicialização e encerramento forçado pelo sistema não garantem continuidade.
+
 ## Distinguir os indicadores
 
 - **Buffer atual**: áudio futuro na fila Rust em frames / 48.000.

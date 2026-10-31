@@ -4,9 +4,9 @@
 
 ## Download
 
-[Baixar getAudioBridge v0.1.0 para Windows e Android](https://github.com/gwennocas/getAudioBridge/releases/tag/v0.1.0).
+[Baixar Android v0.2.0](https://github.com/gwennocas/getAudioBridge/releases/tag/v0.2.0) · [Baixar Windows v0.1.0](https://github.com/gwennocas/getAudioBridge/releases/tag/v0.1.0).
 
-A primeira versão estável cobre transmissão local Wi-Fi/UDP, Windows x64 e Android arm64 em primeiro plano. A distribuição contém **instalador Windows e APK otimizado assinado com chave própria**, compilados em perfil release. O APK não é depurável. O instalador Windows não tem certificado comercial de editor e requer WebView2, que pode ser instalado quando estiver ausente.
+A v0.2.0 adiciona reprodução Android em segundo plano/tela bloqueada e seleção entre alto-falante e fone com fio/USB. O APK arm64 é otimizado, assinado com a mesma chave própria da v0.1.0 e não depurável. Ele é compatível com o transmissor Windows v0.1.0, que permanece disponível na release anterior. O instalador Windows x64 não tem certificado comercial de editor e requer WebView2, que pode ser instalado quando estiver ausente.
 
 Se você instalou a prévia debug `v0.1.0-alpha.1`, guarde IP, porta e buffer, desinstale-a e instale o novo APK uma vez: a chave de assinatura mudou. Futuras atualizações da distribuição preservarão a chave própria. Consulte [a validação](docs/validation.md) para os testes realizados, equipamentos e limites. A latência física até o fone não foi medida e o desempenho depende da rede e do aparelho.
 
@@ -15,9 +15,12 @@ Se você instalou a prévia debug `v0.1.0-alpha.1`, guarde IP, porta e buffer, d
 1. Coloque o PC e o Android na mesma rede local. O PC pode estar ligado ao roteador por Ethernet.
 2. No Windows, escolha a saída que está tocando áudio. Mantenha “Todas as interfaces” ou selecione o IPv4 da rede local e clique **Iniciar transmissão**.
 3. No Android, conecte o fone, digite o IPv4 local exibido no PC, use a mesma porta (padrão **45150/UDP**) e clique **Conectar ao computador**.
-4. Comece com buffer de **60 ms**. Diminua se a rede e o aparelho permitirem; aumente se houver rebufferizações. O ajuste altera o alvo, não promete latência total.
+4. Comece com buffer de **60 ms**. Diminua se a rede e o aparelho permitirem; aumente até **100–120 ms** se houver rebufferizações, especialmente com a tela apagada. O ajuste altera o alvo, não promete latência total.
+5. No Android v0.2.0, use **Sistema**, **Alto-falante** ou **Fone / USB** para escolher onde ouvir, inclusive durante a reprodução. O botão de fone só habilita quando há uma saída com fio/USB conectada. A escolha fica salva; se o fone for removido, o Android usa sua saída padrão até ele voltar. A indicação **Saída em uso** mostra a rota efetiva, que o sistema pode alterar.
 
-O aplicativo Android mantém a tela acesa durante a conexão e **interrompe e desconecta ao perder visibilidade/foco de áudio**. Ao voltar, conecte novamente. Não há serviço ou reprodução em segundo plano. A rota de saída é controlada pelo Android; não há seleção forçada de alto-falante. A saída realmente usada aparece no monitor depois de começar a reprodução.
+Na **v0.2.0**, o Android mantém o áudio em um serviço de mídia: você pode trocar de aplicativo, apagar/bloquear a tela e remover a janela dos recentes. Para encerrar, use **Desconectar** no aplicativo ou nos controles de mídia da notificação/tela bloqueada (o botão de pausa também desconecta). A tela pode apagar normalmente. Ao reabrir o aplicativo, os controles mostram a sessão existente.
+
+O serviço mantém a CPU ativa durante a sessão e solicita uma otimização de Wi-Fi, liberando esses recursos ao desconectar. Chamadas e outros aplicativos podem interromper o áudio conforme as regras de foco do Android; interrupções temporárias retomam quando o sistema devolve o foco, e os controles de mídia permitem retomar uma sessão pausada. Encerrar à força, reiniciar o aparelho ou restrições impostas pelo sistema podem parar o aplicativo. A rota de saída é controlada pelo Android; a saída realmente usada aparece no monitor.
 
 Se não conectar: confirme IP/porta, evite rede de convidados/isolamento de clientes e permita entrada UDP na porta escolhida no Firewall do Windows, somente em rede confiável. O programa não modifica automaticamente o firewall. Uma conexão USB não transporta áudio nesta versão.
 

@@ -44,7 +44,7 @@ Um certificado comercial Windows não é requisito para compilar ou distribuir e
 
 1. Execute `npm run build`, `cargo fmt --all --check` e `cargo test -p bridge-core`.
 2. Compile os dois artefatos e confira assinatura/configuração do APK.
-3. Instale e teste os artefatos de distribuição reais: captura/recepção, canais de áudio, controles de buffer, reconexão, reinício do transmissor e parada do Android ao perder visibilidade.
+3. Instale e teste os artefatos de distribuição reais: captura/recepção, canais de áudio, controles de buffer, reconexão e reinício do transmissor. No Android v0.2.0+, verifique continuidade em HOME, tela bloqueada/apagada e remoção dos recentes; reabra a interface e desconecte também pela notificação. Confirme a liberação de AudioTrack, receptor UDP, serviço e locks de energia após a parada manual. Confira interrupções e retomada por foco de áudio.
 4. Observe buffer, perdas, rebufferizações, underruns e correção de relógio durante um trecho contínuo; registre hardware, duração e carga. Logs nativos extras podem ser habilitados para o ensaio com `adb shell setprop log.tag.getAudioBridge DEBUG`; desative ao terminar. Não há registro de PCM nos logs.
 5. Documente as limitações observadas. Não confunda buffer ou fila AudioTrack com latência física até o fone.
 6. Gere SHA-256 dos arquivos, envie-os a uma release em rascunho, confira tamanho e digest no GitHub e só então publique.

@@ -84,26 +84,29 @@ pub async fn stop(state: State<'_, AppState>) -> Result<(), String> {
 
 #[cfg(target_os = "android")]
 fn output(app: &AppHandle, command: &str) -> Result<serde_json::Value, String> {
+    output_payload(app, command, ())
+}
+#[cfg(target_os = "android")]
+fn output_payload(
+    app: &AppHandle,
+    command: &str,
+    payload: impl serde::Serialize,
+) -> Result<serde_json::Value, String> {
     use tauri::Manager;
     app.state::<tauri_plugin_audio_output::AudioOutput<tauri::Wry>>()
         .0
-        .run_mobile_plugin(command, ())
+        .run_mobile_plugin(command, payload)
         .map_err(|e| e.to_string())
 }
 #[tauri::command]
 pub async fn connect(app: AppHandle, ip: String, port: u16, buffer_ms: u32) -> Result<(), String> {
     #[cfg(target_os = "android")]
     {
-        output(&app, "stop")?;
-        {
-            let mut r = RECEIVER.lock().map_err(|e| e.to_string())?;
-            r.take();
-            *r = Some(Receiver::connect(&ip, port, buffer_ms)?);
-        }
-        if let Err(e) = output(&app, "start") {
-            RECEIVER.lock().unwrap().take();
-            return Err(e);
-        }
+        output_payload(
+            &app,
+            "start",
+            serde_json::json!({"ip":ip,"port":port,"bufferMs":buffer_ms.clamp(20,120)}),
+        )?;
         Ok(())
     }
     #[cfg(not(target_os = "android"))]
@@ -123,17 +126,43 @@ pub async fn disconnect(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 #[tauri::command]
-pub fn set_buffer(buffer_ms: u32) -> Result<(), String> {
-    if let Some(r) = RECEIVER.lock().map_err(|e| e.to_string())?.as_ref() {
-        r.buffer.lock().unwrap().set_target(buffer_ms);
+pub async fn set_buffer(app: AppHandle, buffer_ms: u32) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    {
+        output_payload(
+            &app,
+            "setBuffer",
+            serde_json::json!({"bufferMs":buffer_ms.clamp(20,120)}),
+        )?;
+        return Ok(());
     }
-    Ok(())
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = app;
+        if let Some(r) = RECEIVER.lock().map_err(|e| e.to_string())?.as_ref() {
+            r.buffer.lock().unwrap().set_target(buffer_ms);
+        }
+        Ok(())
+    }
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Status {
     stream: Stats,
     output: serde_json::Value,
+}
+#[tauri::command]
+pub async fn set_output(app: AppHandle, output: String) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    {
+        output_payload(&app, "setOutput", serde_json::json!({"output":output}))?;
+        Ok(())
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = (app, output);
+        Err("Selecione a saída no aplicativo Android".into())
+    }
 }
 #[tauri::command]
 pub async fn status(app: AppHandle, state: State<'_, AppState>) -> Result<Status, String> {
